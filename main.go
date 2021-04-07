@@ -73,6 +73,13 @@ func drawRandomSquares(squareCount Range, canvas *svg.SVG) {
 	}
 }
 
+// drawRandomRecursiveSquares draws a random amount of squares within the given Range
+// then recursively draws concentric smaller squares of random color
+// 		Inspired by: https://www.generativeart.com/on/cic/GA2010/2010_6.pdf
+func drawRandomRecursiveSquares(squareCount Range, canvas *svg.SVG) {
+
+}
+
 func tileSquares(canvas *svg.SVG) {
 	scale := 1.0/8.0
 	length := height * scale
