@@ -35,6 +35,7 @@ func main() {
 	}
 }
 
+// mainDrawing displays an SVG collage
 func mainDrawing(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 
