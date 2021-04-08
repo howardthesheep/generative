@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 	"image"
+	"log"
 	"math"
 	"math/rand"
-	"os"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -27,19 +28,24 @@ const (
 )
 
 func main() {
-	file, err := os.OpenFile("generate.svg", os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
+	http.Handle("/home", http.HandlerFunc(mainDrawing))
+	err := http.ListenAndServe(":8000", nil)
 	if err != nil {
-		panic(err)
+		log.Fatalf("%s", err)
 	}
+}
+
+func mainDrawing(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "image/svg+xml")
 
 	start := time.Now()
-	canvas := svg.New(file)
+	canvas := svg.New(w)
 	canvas.Start(width, height)
 	drawBackground(canvas, "white")
 	//drawRandomSquares(Range{50,500},canvas)
 	//drawRandomRecursiveSquares(Range{200, 300}, canvas)
-	drawSandScript(canvas)
-
+	//drawSandScript(canvas)
+	drawAnimatedLine(canvas)
 	// Timing
 	str := fmt.Sprintf("Time to generate: %s", time.Since(start))
 	println(str)
@@ -158,7 +164,7 @@ func drawSandScript(canvas *svg.SVG) {
 	}
 
 	// Generate 3 random points within each grid box
-	var vertsPerChar = 3 // Vertices per 'character'
+	var vertsPerChar = 5 // Vertices per 'character'
 	var characterPoints [][]image.Point
 
 	for _, gridRange := range gridRanges {
@@ -207,9 +213,15 @@ func drawSandScript(canvas *svg.SVG) {
 			canvas.Bezier(vertexSet[i].X, vertexSet[i].Y,
 				controlA.X, controlA.Y,
 				controlB.X, controlB.Y,
-				vertexSet[j].X, vertexSet[j].Y)
+				vertexSet[j].X, vertexSet[j].Y, "fill:none;stroke:black;")
 		}
 	}
+}
+
+// drawAnimatedLine draws a line across the page with animation
+func drawAnimatedLine(canvas *svg.SVG) {
+	canvas.Line(0, height/2, 0, height/2, "stroke:black;stroke-width:2", `id="newLine"`)
+	canvas.Animate("#newLine", "x2", 0, width, 2, -1)
 }
 
 func tileSquares(canvas *svg.SVG) {
