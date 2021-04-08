@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"math"
 	"math/rand"
 	"os"
@@ -26,22 +27,21 @@ const (
 )
 
 func main() {
-	file, err := os.OpenFile("generate.svg", os.O_CREATE|os.O_TRUNC, os.ModePerm)
+	file, err := os.OpenFile("generate.svg", os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
 
+	start := time.Now()
 	canvas := svg.New(file)
 	canvas.Start(width, height)
 	drawBackground(canvas, "white")
 	//drawRandomSquares(Range{50,500},canvas)
-	start := time.Now()
-	drawRandomRecursiveSquares(Range{200, 300}, canvas)
-	end := time.Now()
+	//drawRandomRecursiveSquares(Range{200, 300}, canvas)
+	drawSandScript(canvas)
 
 	// Timing
-	elapsed := end.Sub(start)
-	str := fmt.Sprintf("Time to generate: %s", elapsed)
+	str := fmt.Sprintf("Time to generate: %s", time.Since(start))
 	println(str)
 
 	canvas.End()
@@ -125,6 +125,89 @@ func drawRandomRecursiveSquares(squareCount Range, canvas *svg.SVG) {
 			canvas.Square(randX+randInset, randY+randInset, j, "fill:rgb("+strconv.Itoa(r2)+
 				","+strconv.Itoa(g2)+
 				","+strconv.Itoa(b2)+");opacity:"+formattedOpac+";")
+		}
+	}
+}
+
+// drawSandScript draws an array of randomly generated 'script-like' characters
+// using bezier curves
+func drawSandScript(canvas *svg.SVG) {
+	type cellBoundary [2]Range                         // Range for Valid X values, Range for Valid Y values //TODO: Is it bad to have type def in a func vs global? Will test to see diff
+	const gridFrac = 1.0 / 5                           // How many cells per col/row
+	var gridRanges []cellBoundary                      // Reference to cell boundaries
+	rng := rand.New(rand.NewSource(time.Now().Unix())) // Create random number generator w/ seed
+
+	// Divide the canvas into grid
+	widthStep := width * gridFrac   // cell width
+	heightStep := height * gridFrac // cell height
+
+	// Store grid cells using 2 Range's
+	for x := float64(0); x < width; x += widthStep {
+		for y := float64(0); y < height; y += heightStep {
+			xRange := Range{
+				Min: x,
+				Max: x + widthStep,
+			}
+			yRange := Range{
+				Min: y,
+				Max: y + heightStep,
+			}
+			boundary := cellBoundary{xRange, yRange}
+			gridRanges = append(gridRanges, boundary)
+		}
+	}
+
+	// Generate 3 random points within each grid box
+	var vertsPerChar = 3 // Vertices per 'character'
+	var characterPoints [][]image.Point
+
+	for _, gridRange := range gridRanges {
+		var vertices []image.Point // Stores vertices for single character
+		xRange := gridRange[0]
+		yRange := gridRange[1]
+
+		for i := 0; i < vertsPerChar; i++ {
+			randX := int(xRange.Min.(float64)) + rng.Intn(int(xRange.Max.(float64))-int(xRange.Min.(float64)))
+			randY := int(yRange.Min.(float64)) + rng.Intn(int(yRange.Max.(float64))-int(yRange.Min.(float64)))
+
+			//fmt.Printf("Cell #%d Vertex Pair #%d (%d,%d)\n",z,i+1,randX,randY)
+
+			vertex := image.Point{
+				X: randX,
+				Y: randY,
+			}
+			vertices = append(vertices, vertex)
+		}
+
+		characterPoints = append(characterPoints, vertices)
+	}
+
+	// Create a Bezier Curve connecting the 3 points
+	for z, vertexSet := range characterPoints {
+		controlA := image.Point{} // (cx,cy)
+		controlB := image.Point{} // (px,py)
+
+		// Generate random points within grid square for controlA & controlB
+		xRange := gridRanges[z][0]
+		yRange := gridRanges[z][1]
+		controlA.X = int(xRange.Min.(float64)) + rng.Intn(int(xRange.Max.(float64))-int(xRange.Min.(float64)))
+		controlA.Y = int(yRange.Min.(float64)) + rng.Intn(int(yRange.Max.(float64))-int(yRange.Min.(float64)))
+		controlB.X = int(xRange.Min.(float64)) + rng.Intn(int(xRange.Max.(float64))-int(xRange.Min.(float64)))
+		controlB.Y = int(yRange.Min.(float64)) + rng.Intn(int(yRange.Max.(float64))-int(yRange.Min.(float64)))
+
+		points := len(vertexSet) // How many points per character
+		for i := 0; i < points; i++ {
+
+			j := i + 1
+			if j == points { // Handle if were at the end of set
+				j = 0
+			}
+
+			// Draw Bezier between 2 points
+			canvas.Bezier(vertexSet[i].X, vertexSet[i].Y,
+				controlA.X, controlA.Y,
+				controlB.X, controlB.Y,
+				vertexSet[j].X, vertexSet[j].Y)
 		}
 	}
 }
