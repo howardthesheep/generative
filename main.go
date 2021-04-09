@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"image"
 	"log"
-	"math"
 	"math/rand"
 	"net/http"
+	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -23,16 +25,40 @@ type Range struct {
 }
 
 const (
-	width  = 1920 // Canvas Width
+	width  = 500  //1920 // Canvas Width
 	height = 1080 // Canvas Height
 )
 
 func main() {
-	http.Handle("/home", http.HandlerFunc(mainDrawing))
-	err := http.ListenAndServe(":8000", nil)
+	// Open browser
+	err := openBrowser("http://localhost:8000/home")
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
+
+	//// "home" Handler
+	//http.Handle("/home", http.HandlerFunc(mainDrawing))
+	//
+	//// Start HTTP Server
+	//err = http.ListenAndServe(":8000", nil)
+	//if err != nil {
+	//	log.Fatalf("%s", err)
+	//}
+
+	file, err := os.OpenFile("mandlebrot.svg", os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		log.Fatalf("%s", err)
+	}
+	start := time.Now()
+	canvas := svg.New(file)
+	canvas.Start(width, height)
+	drawBackground(canvas, "white")
+
+	// Get Timings on draws
+	str := fmt.Sprintf("Time to generate: %s", time.Since(start))
+	println(str)
+
+	canvas.End()
 }
 
 // mainDrawing displays an SVG collage
@@ -43,11 +69,8 @@ func mainDrawing(w http.ResponseWriter, req *http.Request) {
 	canvas := svg.New(w)
 	canvas.Start(width, height)
 	drawBackground(canvas, "white")
-	//drawRandomSquares(Range{50,500},canvas)
-	//drawRandomRecursiveSquares(Range{200, 300}, canvas)
-	//drawSandScript(canvas)
-	drawAnimatedLine(canvas)
-	// Timing
+
+	// Get Timings on draws
 	str := fmt.Sprintf("Time to generate: %s", time.Since(start))
 	println(str)
 
@@ -225,9 +248,20 @@ func drawAnimatedLine(canvas *svg.SVG) {
 	canvas.Animate("#newLine", "x2", 0, width, 2, -1)
 }
 
-func tileSquares(canvas *svg.SVG) {
-	scale := 1.0 / 8.0
-	length := height * scale
+// openBrowser opens the default web browser to the provided url
+func openBrowser(url string) error {
+	var cmd string
+	var args []string
 
-	canvas.Square(0, 0, int(math.Round(length)))
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+	default: // "linux", "freebsd", "openbsd", "netbsd"
+		cmd = "xdg-open"
+	}
+	args = append(args, url)
+	return exec.Command(cmd, args...).Start()
 }
